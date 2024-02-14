@@ -85,7 +85,6 @@ def download_episode(url, download_path):
 
 
 def transcribe_episode(audio_path, transcription_path, transcription_complete):
-    """Transcribes the episode."""
     text = transcribe(audio_path)["text"]
 
     transcription_complete["status"] = True

@@ -15,6 +15,7 @@ from langchain_google_vertexai import VertexAI
 import datetime
 import hashlib
 
+
 # import json
 import requests
 
@@ -38,10 +39,11 @@ def search_podcasts(search_query="science and technology"):  # Use a default que
         A list of dictionaries containing podcast titles and URLs.
     """
 
-    api_key = "R8HRPCSEBJ9SWAZY4LNT"  # Your Podcast Index API key
-    api_secret = "#nh63f26RbrxbV5Z4XKp6#gNwEG5$P$$FQ8qq$cd"  # Your API secret
-
     base_url = "https://api.podcastindex.org/api/1.0/search/byterm?q="
+
+    load_dotenv()
+    api_key = os.getenv("PCI_API_KEY")
+    api_secret = os.getenv("PCI_API_SECRET")
 
     # Construct authentication headers
     epoch_time = int(datetime.datetime.now().timestamp())

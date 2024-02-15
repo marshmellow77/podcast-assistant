@@ -16,15 +16,8 @@ import datetime
 import hashlib
 
 
-# import json
-import requests
-
-# if "transcription_complete" not in st.session_state:
-#     st.session_state.transcription_complete = False
 if "transcribed_text" not in st.session_state:
     st.session_state.transcribed_text = ""
-
-transcription_complete = {"status": False}
 
 # --- Utility Functions ---
 
@@ -88,7 +81,7 @@ def transcribe_episode(audio_path, transcription_path, transcription_complete):
     text = transcribe(audio_path)["text"]
 
     transcription_complete["status"] = True
-    st.session_state.transcribed_text = text
+    # st.session_state.transcribed_text = text
 
     os.makedirs("transcripts", exist_ok=True)
 
@@ -131,17 +124,6 @@ def setup_chatbot(model_id, model_constructor):
 
 def main_podcast_downloader_transcriber():
     st.title("Podcast Downloader & Transcriber")
-    # rss_feed_url = st.text_input("Enter RSS Feed URL")
-
-    # if rss_feed_url:
-    #     feed = feedparser.parse(rss_feed_url)
-    #     episodes = sorted(
-    #         feed.entries, key=lambda ep: ep.published_parsed, reverse=True
-    #     )
-    #     episode_titles = [episode.title for episode in episodes]
-
-    #     if episode_titles:
-    #         episode_choice = st.selectbox("Select an episode", episode_titles)
 
     search_query = st.text_input("Search for a podcast")
 
@@ -188,7 +170,9 @@ def main_podcast_downloader_transcriber():
                             ).replace("downloads", "transcripts")
 
                             if os.path.exists(download_path):
-                                st.error("Episode already downloaded!")
+                                st.warning(
+                                    "Episode already downloaded - loading audio from file."
+                                )
                             else:
                                 if download_episode(episode_url, download_path):
                                     st.success("Episode downloaded!")
@@ -196,16 +180,13 @@ def main_podcast_downloader_transcriber():
                                     st.error("Failed to download episode.")
 
                             if os.path.exists(transcript_path):
-                                st.warning("Episode already transcribed!")
-                                f = open(
-                                    os.path.join(
-                                        "transcripts", filename.replace(".mp3", ".txt")
-                                    )
+                                st.warning(
+                                    "Episode already transcribed - loading transcription from file."
                                 )
+                                f = open(transcript_path)
                                 st.session_state.transcribed_text = f.read()
                                 # transcription_complete["status"] = True
                                 st.session_state.transcription_complete = True
-                                # st.rerun()
                             else:
                                 audio_length = MP3(download_path).info.length
                                 st.write(
@@ -232,52 +213,9 @@ def main_podcast_downloader_transcriber():
                                 countdown_timer(duration, transcription_complete)
 
                                 transcription_thread.join()
-
+                                f = open(transcript_path)
+                                st.session_state.transcribed_text = f.read()
                                 st.session_state.transcription_complete = True
-                        # st.rerun()
-
-                    # if not os.path.exists(transcript_path):
-                    #     audio_length = MP3(download_path).info.length
-                    #     st.write(
-                    #         f"Length of podcast episode: {audio_length/60:.1f} minutes"
-                    #     )
-                    #     duration = int(audio_length / 38)
-                    #     st.write(
-                    #         f"Estimating ~{duration} seconds (with ~38x speed) for transcribing ..."
-                    #     )
-                    #     transcription_thread = threading.Thread(
-                    #         target=transcribe_episode,
-                    #         args=(
-                    #             download_path,
-                    #             transcript_path,
-                    #         ),
-                    #     )
-                    #     transcription_thread.start()
-                    # else:
-                    #     with open(transcript_path, "r") as file:
-                    #         st.session_state.transcribed_text = file.read()
-                    #         st.success("Transcription loaded from file.")
-                    #         return
-
-                    # if not st.session_state.get("transcription_complete", False):
-                    #     # duration = ...  # calculate as before
-                    #     countdown_text = st.empty()
-                    #     for i in range(duration, -200, -1):
-                    #         countdown_text.text(
-                    #             f"Transcribing... (approx. {i} seconds remaining)"
-                    #         )
-                    #         time.sleep(1)
-                    # else:
-                    #     st.success("Transcription Complete!")
-
-                    # countdown_timer(duration)
-
-                    # transcription_thread.join()
-
-                    # transcription_text = transcribe_episode(file_path)
-                    # save_transcription(transcription_text, transcript_path)
-                    # st.session_state.transcribed_text = transcription_text
-                    # st.success("Episode transcribed!")
 
 
 def main_chatbot():
@@ -332,16 +270,26 @@ def main_chatbot():
                 "Model selected", [st.session_state.model_name], disabled=True
             )
 
-            content = "=== BEGIN FILE ===\n"
-            content += st.session_state.transcribed_text
-            content += "\n=== END FILE ===\nPlease confirm that you have analysed the audio content by saying 'Yes, I have analysed the audio content.'. Use British English spelling."
-            output = st.session_state.chatchain(content)["response"]
-            st.session_state.messages.append(
-                {
-                    "role": "user",
-                    "content": "I have uploaded an audio file. Please confirm that you have read the transcripts.",
-                }
-            )
+            system_prompt = f"""You are a helpful assistant that excels in analysing transcripts for the user.
+Below is the transcript of a podcast episode. Answer all queries from the user truthfully. Rely only on the information given in the transcript. Do not make things up. It is ok to say "There is no information about this in the transcript."
+
+=== BEGIN TRANSCRIPT ===
+{st.session_state.transcribed_text}
+=== END TRANSCRIPT ===
+
+Please confirm that you have analysed the transcript and you are ready to start chatting by saying "I have analysed the transcript, feel free to ask any questions about it."
+"""
+
+            # content = "=== BEGIN FILE ===\n"
+            # content += st.session_state.transcribed_text
+            # content += "\n=== END FILE ===\nPlease confirm that you have analysed the audio content by saying 'Yes, I have analysed the audio content.'. Use British English spelling."
+            output = st.session_state.chatchain(system_prompt)["response"]
+            # st.session_state.messages.append(
+            #     {
+            #         "role": "user",
+            #         "content": "I have uploaded an audio file. Please confirm that you have read the transcripts.",
+            #     }
+            # )
             st.session_state.messages.append({"role": "assistant", "content": output})
 
     # Chat input and response logic
